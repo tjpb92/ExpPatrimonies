@@ -1,0 +1,8 @@
+# My .gitignore file
+
+ExpPatrimonies.prop
+*.xlsx
+
+/nbproject/private/
+/build/
+/dist/
