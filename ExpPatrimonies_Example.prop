@@ -1,6 +1,6 @@
 # Properties for production environnement
 prod.mgoserver.name=Mongo Prod
-prod.mgoserver.ip=1.2.34
+prod.mgoserver.ip=1.2.3.4
 prod.mgoserver.port=27017
 prod.mgoserver.dbname=bdd
 prod.mgoserver.login=login
