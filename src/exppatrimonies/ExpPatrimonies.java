@@ -34,28 +34,335 @@ import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.bson.Document;
+import utils.ApplicationProperties;
+import utils.DBServer;
+import utils.DBServerException;
 
 /**
  * Programmes servant à exporter dans un fichier Excel les patrimoines extraits
  * d'une base de données MongoDb.
  *
  * @author Thierry Baribaud
- * @version 0.02
+ * @version 0.03
  */
 public class ExpPatrimonies {
 
-    private final static String path = "c:\\temp";
+    /**
+     * mgoDbServerType : prod pour le serveur de production, pre-prod pour le
+     * serveur de pré-production. Valeur par défaut : pre-prod.
+     */
+    private String mgoDbServerType = "pre-prod";
 
-    private final static String filename = "patrimonies.xlsx";
+    /**
+     * debugMode : fonctionnement du programme en mode debug (true/false).
+     * Valeur par défaut : false.
+     */
+    private static boolean debugMode = false;
+
+    /**
+     * testMode : fonctionnement du programme en mode test (true/false). Valeur
+     * par défaut : false.
+     */
+    private static boolean testMode = false;
+
+    /**
+     * path : répertoire où sera déposé le fichier des résultats
+     */
+    private String path = ".";
+
+    /**
+     * filename : nom du fichier contenant les résultats
+     */
+    private String filename = "patrimonies.xlsx";
+
+    /**
+     * unum : référence au service d'urgence (identifiant interne)
+     */
+    private int unum;
+
+    /**
+     * clientCompanyUuid : identifiant universel unique du service d'urgence
+     */
+    private String clientCompanyUuid = null;
 
     private final static String HOST = "1.2.3.4";
     private final static int PORT = 27017;
 
     /**
+     * Constructeur principal de la classe ExpPatrimonies
+     *
+     * @param args arguments en ligne de commande
+     * @throws GetArgsException en cas d'erreur avec les paramètres en ligne de
+     * commande
+     * @throws java.io.IOException en cas d'erreur d'entrée/sortie.
+     * @throws utils.DBServerException en cas d'erreur avec le serveur de base
+     * de données.
+     */
+    public ExpPatrimonies(String[] args) throws GetArgsException, IOException, DBServerException {
+        ApplicationProperties applicationProperties;
+        DBServer mgoServer;
+        MongoClient mongoClient;
+        MongoDatabase mongoDatabase;
+
+        System.out.println("Création d'une instance de ExpPatrimonies ...");
+
+        System.out.println("Analyse des arguments de la ligne de commande ...");
+        this.getArgs(args);
+        System.out.println("Argument(s) en ligne de commande lus().");
+
+        System.out.println("Lecture des paramètres d'exécution ...");
+        applicationProperties = new ApplicationProperties("ExpPatrimonies.prop");
+        System.out.println("Paramètres d'exécution lus.");
+
+        System.out.println("Lecture des paramètres du serveur Mongo ...");
+        mgoServer = new DBServer(mgoDbServerType, "mgoserver", applicationProperties);
+        System.out.println("Paramètres du serveur Mongo lus.");
+        if (debugMode) {
+            System.out.println(mgoServer);
+        }
+
+        if (debugMode) {
+            System.out.println(this.toString());
+        }
+
+        System.out.println("Ouverture de la connexion au serveur MongoDb : " + mgoServer.getName());
+        mongoClient = new MongoClient(mgoServer.getIpAddress(), (int) mgoServer.getPortNumber());
+
+        System.out.println("Connexion à la base de données : " + mgoServer.getDbName());
+        mongoDatabase = mongoClient.getDatabase(mgoServer.getDbName());
+
+        System.out.println("Export des données ...");
+        exportPatrimoniesToExcel(mongoDatabase);
+
+    }
+
+    /**
      * @param args arguments en ligne de commande
      */
     public static void main(String[] args) {
+        ExpPatrimonies expPatrimonies;
 
+        System.out.println("Lancement de ExpPatrimonies ...");
+        try {
+            expPatrimonies = new ExpPatrimonies(args);
+        } catch (GetArgsException | IOException | DBServerException exception) {
+            Logger.getLogger(ExpPatrimonies.class.getName()).log(Level.SEVERE, null, exception);
+//            Logger.getLogger(ExpPatrimonies.class.getName()).log(Level.INFO, null, exception);
+        }
+
+        System.out.println("Fin de ExpPatrimonies.");
+
+    }
+
+    /**
+     * Récupère les paramètres en ligne de commande
+     *
+     * @param args arguments en ligne de commande
+     */
+    private void getArgs(String[] args) throws GetArgsException {
+        int i;
+        int n;
+        int ip1;
+        String currentParam;
+        String nextParam;
+
+        n = args.length;
+        System.out.println("nargs=" + n);
+        for (i = 0; i < n; i++) {
+            System.out.println("args[" + i + "]=" + args[i]);
+        }
+        i = 0;
+        while (i < n) {
+//            System.out.println("args[" + i + "]=" + Args[i]);
+            currentParam = args[i];
+            ip1 = i + 1;
+            nextParam = (ip1 < n) ? args[ip1] : null;
+            switch (currentParam) {
+                case "-mgodb":
+                    if (nextParam != null) {
+                        if (nextParam.equals("pre-prod") || nextParam.equals("prod")) {
+                            this.mgoDbServerType = nextParam;
+                        } else {
+                            throw new GetArgsException("ERREUR : Mauvais serveur Mongo : " + nextParam);
+                        }
+                        i = ip1;
+                    } else {
+                        throw new GetArgsException("ERREUR : Serveur Mongo non définie");
+                    }
+                    break;
+                case "-path":
+                    if (nextParam != null) {
+                        this.path = nextParam;
+                        i = ip1;
+                    } else {
+                        throw new GetArgsException("ERREUR : Répertoire non défini");
+                    }
+                    break;
+                case "-o":
+                    if (nextParam != null) {
+                        this.filename = nextParam;
+                        i = ip1;
+                    } else {
+                        throw new GetArgsException("ERREUR : Fichier non défini");
+                    }
+                    break;
+                case "-u":
+                    if (nextParam != null) {
+                        try {
+                            this.unum = Integer.parseInt(nextParam);
+                            i = ip1;
+                        } catch (Exception exception) {
+                            throw new GetArgsException("L'identifiant du service d'urgence doit être numérique : " + nextParam);
+                        }
+
+                    } else {
+                        throw new GetArgsException("ERREUR : Identifiant du service d'urgence non défini");
+                    }
+                    break;
+                case "-clientCompanyUuid":
+                    if (nextParam != null) {
+                        this.clientCompanyUuid = nextParam;
+                        i = ip1;
+                    } else {
+                        throw new GetArgsException("ERREUR : Identifiant UUID du service d'urgence non défini");
+                    }
+                    break;
+                case "-d":
+                    setDebugMode(true);
+                    break;
+                case "-t":
+                    setTestMode(true);
+                    break;
+                default:
+                    usage();
+                    throw new GetArgsException("ERREUR : Mauvais paramètre : " + currentParam);
+            }
+            i++;
+        }
+
+        if (unum > 0 && clientCompanyUuid != null) {
+            System.out.println("unum:" + unum + ", clientCompanyUuid:" + clientCompanyUuid);
+            throw new GetArgsException("ERREUR : Veuillez choisir unum ou uuid");
+        }
+    }
+
+    /**
+     * Affiche le mode d'utilisation du programme.
+     */
+    public static void usage() {
+        System.out.println("Usage : java ExpPatrimonies"
+                + " [-mgodb prod|pre-prod]"
+                + " [-p path]"
+                + " [-o file]"
+                + " [-u unum|-clientCompanyUuid uuid]"
+                + " [-d] [-t]");
+    }
+
+    /**
+     * @return mgoDbServerType retourne le type de serveur MongoDb
+     */
+    private String getMgoDbServerType() {
+        return (mgoDbServerType);
+    }
+
+    /**
+     * @param mgoDbServerType définit le type de serveur MongoDb
+     */
+    private void setMgoDbServerType(String mgoDbServerType) {
+        this.mgoDbServerType = mgoDbServerType;
+    }
+
+    /**
+     * @return debugMode : retourne le mode de fonctionnement debug.
+     */
+    public boolean getDebugMode() {
+        return (debugMode);
+    }
+
+    /**
+     * @param debugMode : fonctionnement du programme en mode debug
+     * (true/false).
+     */
+    public void setDebugMode(boolean debugMode) {
+        ExpPatrimonies.debugMode = debugMode;
+    }
+
+    /**
+     * @return testMode : retourne le mode de fonctionnement test.
+     */
+    public boolean getTestMode() {
+        return (testMode);
+    }
+
+    /**
+     * @param testMode : fonctionnement du programme en mode test (true/false).
+     */
+    public void setTestMode(boolean testMode) {
+        ExpPatrimonies.testMode = testMode;
+    }
+
+    /**
+     * @return retourne répertoire où sera déposé le fichier des résultats
+     */
+    public String getPath() {
+        return path;
+    }
+
+    /**
+     * @param path définit répertoire où sera déposé le fichier des résultats
+     */
+    public void setPath(String path) {
+        this.path = path;
+    }
+
+    /**
+     * @return retourne le nom du fichier contenant les résultats
+     */
+    public String getFilename() {
+        return filename;
+    }
+
+    /**
+     * @param filename définit le nom du fichier contenant les résultats
+     */
+    public void setFilename(String filename) {
+        this.filename = filename;
+    }
+
+    /**
+     * @return retourne la référence au service d'urgence (identifiant interne)
+     */
+    public int getUnum() {
+        return unum;
+    }
+
+    /**
+     * @param unum définit la référence au service d'urgence (identifiant
+     * interne)
+     */
+    public void setUnum(int unum) {
+        this.unum = unum;
+    }
+
+    /**
+     * @return retourne l'identifiant universel unique du service d'urgence
+     */
+    public String getClientCompanyUuid() {
+        return clientCompanyUuid;
+    }
+
+    /**
+     * @param clientCompanyUuid définit l'identifiant universel unique du
+     * service d'urgence
+     */
+    public void setClientCompanyUuid(String clientCompanyUuid) {
+        this.clientCompanyUuid = clientCompanyUuid;
+    }
+
+    /**
+     * Exporte les données dans le fichier Excel
+     */
+    private void exportPatrimoniesToExcel(MongoDatabase mongoDatabase) {
         FileOutputStream out;
         XSSFWorkbook classeur;
         XSSFSheet feuille;
@@ -66,8 +373,6 @@ public class ExpPatrimonies {
         XSSFCellStyle titleStyle;
         ObjectMapper objectMapper;
         Patrimony patrimony;
-        MongoDatabase mongoDatabase;
-        MongoClient MyMongoClient;
         CreationHelper createHelper;
         XSSFHyperlink link;
         XSSFCellStyle hlinkStyle;
@@ -76,9 +381,6 @@ public class ExpPatrimonies {
         Agency agency;
 
         objectMapper = new ObjectMapper();
-
-        MyMongoClient = new MongoClient(HOST, PORT);
-        mongoDatabase = MyMongoClient.getDatabase("bdd");
 
         MongoCollection<Document> patrimoniesCollection = mongoDatabase.getCollection("patrimonies");
         System.out.println(patrimoniesCollection.count() + " patrimoines");
@@ -170,7 +472,7 @@ public class ExpPatrimonies {
                             = agenciesCollection.find(new BasicDBObject("uid", agencyUuids.get(0))).iterator();
                     if (agenciesCursor.hasNext()) {
                         agency = objectMapper.readValue(agenciesCursor.next().toJson(), Agency.class);
-                        System.out.println("  label:"+agency.getLabel());
+                        System.out.println("  label:" + agency.getLabel());
                         cell.setCellValue(agency.getLabel());
                     } else {
                         cell.setCellValue(agencyUuids.get(0));
@@ -218,7 +520,7 @@ public class ExpPatrimonies {
 
         // Enregistrement du classeur dans un fichier
         try {
-            out = new FileOutputStream(new File(path + "\\" + filename));
+            out = new FileOutputStream(new File(getPath() + "\\" + getFilename()));
             classeur.write(out);
             out.close();
             System.out.println("Fichier Excel " + filename + " créé dans " + path);
@@ -228,6 +530,24 @@ public class ExpPatrimonies {
             Logger.getLogger(ExpPatrimonies.class.getName()).log(Level.SEVERE, null, ex);
         }
 
+    }
+
+    /**
+     * Retourne le contenu de ExpPatrimonies
+     *
+     * @return retourne le contenu de ExpPatrimonies
+     */
+    @Override
+    public String toString() {
+        return "ExpPatrimonies:{"
+                + "mgoDbServerType:" + mgoDbServerType
+                + ", path:" + path
+                + ", file:" + filename
+                + ", unum:" + unum
+                + ", clientCompanyUuid:" + clientCompanyUuid
+                + ", debugMode:" + debugMode
+                + ", testMode:" + testMode
+                + "}";
     }
 
 }
