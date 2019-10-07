@@ -1,8 +1,6 @@
 package exppatrimonies;
 
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -10,12 +8,13 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.*;
 import utils.DBServerException;
+import utils.GetArgsException;
 
 /**
  * Jeux de test pour tester la classe ExpPatrimonies
  *
  * @author Thierry Baribaud
- * @version 0.03
+ * @version 0.04
  */
 public class ExpPatrimoniesTest {
 

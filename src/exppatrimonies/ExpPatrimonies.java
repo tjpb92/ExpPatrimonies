@@ -37,13 +37,15 @@ import org.bson.Document;
 import utils.ApplicationProperties;
 import utils.DBServer;
 import utils.DBServerException;
+import utils.GetArgsException;
+import utils.Md5;
 
 /**
  * Programmes servant à exporter dans un fichier Excel les patrimoines extraits
  * d'une base de données MongoDb.
  *
  * @author Thierry Baribaud
- * @version 0.03
+ * @version 0.04
  */
 public class ExpPatrimonies {
 
@@ -243,6 +245,8 @@ public class ExpPatrimonies {
         if (unum > 0 && clientCompanyUuid != null) {
             System.out.println("unum:" + unum + ", clientCompanyUuid:" + clientCompanyUuid);
             throw new GetArgsException("ERREUR : Veuillez choisir unum ou uuid");
+        } else {
+            clientCompanyUuid = Md5.encode("u:" + unum);
         }
     }
 
@@ -379,6 +383,9 @@ public class ExpPatrimonies {
         XSSFFont hlinkFont;
         List<String> agencyUuids;
         Agency agency;
+        BasicDBObject filter;
+        BasicDBObject orderBy;
+        MongoCursor<Document> patrimoniesCursor;
 
         objectMapper = new ObjectMapper();
 
@@ -435,9 +442,17 @@ public class ExpPatrimonies {
         cell.setCellStyle(titleStyle);
         cell.setCellValue("Agences");
 
-        // Lit les patrimoines classés par références
-        MongoCursor<Document> patrimoniesCursor
-                = patrimoniesCollection.find().sort(new BasicDBObject("ref", 1)).iterator();
+        // Lit les patrimoines classés par références optionnellement filtrés par client
+        orderBy = new BasicDBObject("ref", 1);
+        if (clientCompanyUuid != null) {
+            filter = new BasicDBObject("companyUid", clientCompanyUuid);
+            if (debugMode) {
+                System.out.println("filter:" + filter);
+            }
+            patrimoniesCursor = patrimoniesCollection.find(filter).sort(orderBy).iterator();
+        } else {
+            patrimoniesCursor = patrimoniesCollection.find().sort(orderBy).iterator();
+        }
         int n = 0;
         try {
             while (patrimoniesCursor.hasNext()) {

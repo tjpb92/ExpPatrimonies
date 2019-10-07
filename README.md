@@ -6,9 +6,9 @@ Programme Java permettant d'extraire les patrimoines d'une base de données local
 java ExpPatrimonies [-mgoserver db] [-p chemin vers fichier] [-o fichier] [-u unum|-clientCompanyUuid uuid] [-d] [-t] 
 ```
 où :
-* ```-mgoserver prod|pre-prod``` est la référence à la base de données MongoDb, par défaut désigne la base de données de pre-production. Voir fichier *ExpPatrimonies.prop* (optionnel).
-* ```-p chemin vers fichier``` est le chemin vers le fichier Excel. Amorcé à vide par défaut (paramètre optionnel).
-* ```-o fichier``` est le nom du fichier Excel qui recevra les sociétés. Amorcé à *patrimonies.xlsx* par défaut (paramètre optionnel).
+* ```-mgoserver prod|pre-prod``` est la référence à la base de données MongoDb, par défaut désigne la base de données de pré-production. Voir fichier *ExpPatrimonies.prop* (optionnel).
+* ```-p chemin vers fichier``` est le chemin vers le fichier Excel. Amorcé au répertoire courant (.) par défaut (paramètre optionnel).
+* ```-o fichier``` est le nom du fichier Excel qui recevra les patrimoines. Amorcé à *patrimonies.xlsx* par défaut (paramètre optionnel).
 * ```-u unum``` est l'identifiant interne du client concerné. Non définit par défaut (paramètre optionnel).
 * ```-clientCompanyUuid uuid``` est l'identifiant universel unique du client concerné. Non définit par défaut (paramètre optionnel).
 * ```-d``` le programme s'exécute en mode débug, il est beaucoup plus verbeux. Désactivé par défaut (paramètre optionnel).
@@ -20,8 +20,8 @@ où :
 - Driver MongoDB
 - [xmlbeans-2.6.0.jar](https://xmlbeans.apache.org/)
 - [commons-collections4-4.1.jar](https://commons.apache.org/proper/commons-collections/download_collections.cgi)
-- [junit-4.12.jar] (https://github.com/junit-team/junit4/releases/tag/r4.12)
-- [hamcrest-2.1.jar] (https://search.maven.org/search?q=g:org.hamcrest)
+- [junit-4.12.jar](https://github.com/junit-team/junit4/releases/tag/r4.12)
+- [hamcrest-2.1.jar](https://search.maven.org/search?q=g:org.hamcrest)
 
 ## Fichier des paramètres : 
 
