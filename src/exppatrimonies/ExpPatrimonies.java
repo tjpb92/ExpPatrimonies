@@ -1,5 +1,6 @@
 package exppatrimonies;
 
+import bkgpi2a.Address;
 import bkgpi2a.Agency;
 import bkgpi2a.Patrimony;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,13 +40,14 @@ import utils.DBServer;
 import utils.DBServerException;
 import utils.GetArgsException;
 import utils.Md5;
+import utils.ValidServers;
 
 /**
  * Programmes servant à exporter dans un fichier Excel les patrimoines extraits
  * d'une base de données MongoDb.
  *
  * @author Thierry Baribaud
- * @version 0.04
+ * @version 0.05
  */
 public class ExpPatrimonies {
 
@@ -53,7 +55,7 @@ public class ExpPatrimonies {
      * mgoDbServerType : prod pour le serveur de production, pre-prod pour le
      * serveur de pré-production. Valeur par défaut : pre-prod.
      */
-    private String mgoDbServerType = "pre-prod";
+    private static String mgoDbServerType = "pre-prod";
 
     /**
      * debugMode : fonctionnement du programme en mode debug (true/false).
@@ -70,25 +72,22 @@ public class ExpPatrimonies {
     /**
      * path : répertoire où sera déposé le fichier des résultats
      */
-    private String path = ".";
+    private static String path = ".";
 
     /**
      * filename : nom du fichier contenant les résultats
      */
-    private String filename = "patrimonies.xlsx";
+    private static String filename = "patrimonies.xlsx";
 
     /**
      * unum : référence au service d'urgence (identifiant interne)
      */
-    private int unum;
+    private static int unum;
 
     /**
      * clientCompanyUuid : identifiant universel unique du service d'urgence
      */
-    private String clientCompanyUuid = null;
-
-    private final static String HOST = "1.2.3.4";
-    private final static int PORT = 27017;
+    private static String clientCompanyUuid = null;
 
     /**
      * Constructeur principal de la classe ExpPatrimonies
@@ -160,8 +159,9 @@ public class ExpPatrimonies {
      * Récupère les paramètres en ligne de commande
      *
      * @param args arguments en ligne de commande
+     * @throws utils.GetArgsException en cas d'erreur sur les paramètres
      */
-    private void getArgs(String[] args) throws GetArgsException {
+    public static void getArgs(String[] args) throws GetArgsException {
         int i;
         int n;
         int ip1;
@@ -182,8 +182,8 @@ public class ExpPatrimonies {
             switch (currentParam) {
                 case "-mgodb":
                     if (nextParam != null) {
-                        if (nextParam.equals("pre-prod") || nextParam.equals("prod")) {
-                            this.mgoDbServerType = nextParam;
+                        if (ValidServers.isAValidServer(nextParam)) {
+                            mgoDbServerType = nextParam;
                         } else {
                             throw new GetArgsException("ERREUR : Mauvais serveur Mongo : " + nextParam);
                         }
@@ -194,7 +194,7 @@ public class ExpPatrimonies {
                     break;
                 case "-path":
                     if (nextParam != null) {
-                        this.path = nextParam;
+                        path = nextParam;
                         i = ip1;
                     } else {
                         throw new GetArgsException("ERREUR : Répertoire non défini");
@@ -202,7 +202,7 @@ public class ExpPatrimonies {
                     break;
                 case "-o":
                     if (nextParam != null) {
-                        this.filename = nextParam;
+                        filename = nextParam;
                         i = ip1;
                     } else {
                         throw new GetArgsException("ERREUR : Fichier non défini");
@@ -211,7 +211,7 @@ public class ExpPatrimonies {
                 case "-u":
                     if (nextParam != null) {
                         try {
-                            this.unum = Integer.parseInt(nextParam);
+                            unum = Integer.parseInt(nextParam);
                             i = ip1;
                         } catch (Exception exception) {
                             throw new GetArgsException("L'identifiant du service d'urgence doit être numérique : " + nextParam);
@@ -223,17 +223,17 @@ public class ExpPatrimonies {
                     break;
                 case "-clientCompanyUuid":
                     if (nextParam != null) {
-                        this.clientCompanyUuid = nextParam;
+                        clientCompanyUuid = nextParam;
                         i = ip1;
                     } else {
                         throw new GetArgsException("ERREUR : Identifiant UUID du service d'urgence non défini");
                     }
                     break;
                 case "-d":
-                    setDebugMode(true);
+                    debugMode = true;
                     break;
                 case "-t":
-                    setTestMode(true);
+                    testMode = true;
                     break;
                 default:
                     usage();
@@ -255,7 +255,7 @@ public class ExpPatrimonies {
      */
     public static void usage() {
         System.out.println("Usage : java ExpPatrimonies"
-                + " [-mgodb prod|pre-prod]"
+                + " [-mgodb dbserver]"
                 + " [-p path]"
                 + " [-o file]"
                 + " [-u unum|-clientCompanyUuid uuid]"
@@ -273,7 +273,7 @@ public class ExpPatrimonies {
      * @param mgoDbServerType définit le type de serveur MongoDb
      */
     private void setMgoDbServerType(String mgoDbServerType) {
-        this.mgoDbServerType = mgoDbServerType;
+        ExpPatrimonies.mgoDbServerType = mgoDbServerType;
     }
 
     /**
@@ -316,7 +316,7 @@ public class ExpPatrimonies {
      * @param path définit répertoire où sera déposé le fichier des résultats
      */
     public void setPath(String path) {
-        this.path = path;
+        ExpPatrimonies.path = path;
     }
 
     /**
@@ -330,7 +330,7 @@ public class ExpPatrimonies {
      * @param filename définit le nom du fichier contenant les résultats
      */
     public void setFilename(String filename) {
-        this.filename = filename;
+        ExpPatrimonies.filename = filename;
     }
 
     /**
@@ -345,7 +345,7 @@ public class ExpPatrimonies {
      * interne)
      */
     public void setUnum(int unum) {
-        this.unum = unum;
+        ExpPatrimonies.unum = unum;
     }
 
     /**
@@ -360,7 +360,7 @@ public class ExpPatrimonies {
      * service d'urgence
      */
     public void setClientCompanyUuid(String clientCompanyUuid) {
-        this.clientCompanyUuid = clientCompanyUuid;
+        ExpPatrimonies.clientCompanyUuid = clientCompanyUuid;
     }
 
     /**
@@ -386,6 +386,8 @@ public class ExpPatrimonies {
         BasicDBObject filter;
         BasicDBObject orderBy;
         MongoCursor<Document> patrimoniesCursor;
+        List<Address> addresses;
+        Address address;
 
         objectMapper = new ObjectMapper();
 
@@ -442,6 +444,14 @@ public class ExpPatrimonies {
         cell.setCellStyle(titleStyle);
         cell.setCellValue("Agences");
 
+        cell = titre.createCell((short) 4);
+        cell.setCellStyle(titleStyle);
+        cell.setCellValue("Adresses");
+
+        cell = titre.createCell((short) 5);
+        cell.setCellStyle(titleStyle);
+        cell.setCellValue("Adresses complémentaires");
+
         // Lit les patrimoines classés par références optionnellement filtrés par client
         orderBy = new BasicDBObject("ref", 1);
         if (clientCompanyUuid != null) {
@@ -460,7 +470,10 @@ public class ExpPatrimonies {
                 System.out.println(n
                         + " ref:" + patrimony.getRef()
                         + ", label:" + patrimony.getLabel()
-                        + ", uid:" + patrimony.getUid());
+                        + ", uid:" + patrimony.getUid()
+                        + ", addresses:" + patrimony.getAddresses()
+                        + ", complementaryAdresses:" + patrimony.getComplementaryAddresses()
+                );
                 n++;
                 ligne = feuille.createRow(n);
 
@@ -475,7 +488,20 @@ public class ExpPatrimonies {
                 cell = ligne.createCell(2);
                 cell.setCellValue(patrimony.getUid());
                 link = (XSSFHyperlink) createHelper.createHyperlink(HyperlinkType.URL);
-                link.setAddress("https://dashboard.performance-immo.com/patrimonies/" + patrimony.getUid());
+                switch (mgoDbServerType) {
+                    case "prod":
+                        link.setAddress("https://dashboard.performance-immo.com/patrimonies/" + patrimony.getUid());
+                        break;
+                    case "pre-prod":
+                        link.setAddress("https://dashboard.performance-immo.com/patrimonies/" + patrimony.getUid());
+                        break;
+                    case "prod2":
+                        link.setAddress("https://front.declarimmo.fr/patrimonies/" + patrimony.getUid());
+                        break;
+                    default:
+                        link.setAddress("https://front-dev.declarimmo.fr/patrimonies/" + patrimony.getUid());
+                        break;
+                }
                 link.setLabel(patrimony.getUid());
                 cell.setHyperlink((XSSFHyperlink) link);
                 cell.setCellStyle(hlinkStyle);
@@ -496,10 +522,28 @@ public class ExpPatrimonies {
                     cell.setCellValue("Aucune");
                 }
                 cell.setCellStyle(cellStyle);
+
+                cell = ligne.createCell(4);
+                if ((addresses = patrimony.getAddresses()) != null) {
+                    if (addresses.size()>0) {
+                        address = addresses.get(0);
+                        cell.setCellValue(address.getNumber() + ", " + address.getStreet() + " " + address.getZipCode() + " " + address.getCity());
+                    }
+                }
+                cell.setCellStyle(cellStyle);
+
+                cell = ligne.createCell(5);
+                if ((addresses = patrimony.getComplementaryAddresses()) != null) {
+                    if (addresses.size()>0) {
+                        address = addresses.get(0);
+                        cell.setCellValue(address.getNumber() + ", " + address.getStreet() + " " + address.getZipCode() + " " + address.getCity());
+                    }
+                }
+                cell.setCellStyle(cellStyle);
             }
 
             // Ajustement automatique de la largeur des colonnes
-            for (int k = 0; k < 4; k++) {
+            for (int k = 0; k < 6; k++) {
                 feuille.autoSizeColumn(k);
             }
 
